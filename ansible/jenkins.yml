@@ -1,0 +1,46 @@
+- hosts: jenkins
+  become: yes
+  tasks:
+    - name: Install Java, Maven, Docker and Git
+      apt:
+        name: [openjdk-21-jdk, maven, docker.io, git, curl]
+        state: present
+        update_cache: yes
+
+    - name: Add Jenkins GPG key
+      get_url:
+        url: https://pkg.jenkins.io/debian-stable/jenkins.io-2026.key
+        dest: /usr/share/keyrings/jenkins-keyring.asc
+        mode: '0644'
+        force: yes
+
+    - name: Add Jenkins repository
+      apt_repository:
+        repo: "deb [signed-by=/usr/share/keyrings/jenkins-keyring.asc] https://pkg.jenkins.io/debian-stable binary/"
+        state: present
+
+    - name: Install Jenkins
+      apt:
+        name: jenkins
+        state: present
+        update_cache: yes
+
+    - name: Let the jenkins user run Docker
+      user:
+        name: jenkins
+        groups: docker
+        append: yes
+
+    - name: Install kubectl
+      shell: |
+        curl -fsSL -o /usr/local/bin/kubectl https://dl.k8s.io/release/$(curl -Ls https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl
+        chmod +x /usr/local/bin/kubectl
+      args:
+        creates: /usr/local/bin/kubectl
+
+    - name: Start and enable Docker and Jenkins
+      service:
+        name: "{{ item }}"
+        state: restarted
+        enabled: yes
+      loop: [docker, jenkins]
